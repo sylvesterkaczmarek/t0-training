@@ -1,12 +1,12 @@
 """7B run config, architecture-matched to OLMo-core's `olmo3_7B` model factory
 (see configs/olmo3-7B.yaml for the OLMo-core equivalent run).
 
-Same hyperparameters as config_3b.py except model shape and a halved rank
-microbatch (as in olmo3-7B.yaml, for 7B memory safety) -- no code changes
-are needed to scale up, only this config.
+Same hyperparameters as config_3b.py except model shape and a smaller rank
+microbatch for 7B memory safety. Two sequences per rank with four accumulation
+steps on 16 GPUs preserve the global batch of 262,144 tokens.
 
 Launch with:
-    torchrun --nproc_per_node=4 --nnodes=2 ... scripts/train.py \\
+    torchrun --nproc_per_node=4 --nnodes=4 ... scripts/train.py \\
         --config t0_training/configs/config_7b.py
 """
 
@@ -21,7 +21,7 @@ RUN_CONFIG = RunConfig(
     training=TrainingConfig(
         # max_steps left unset as scripts/train.py computes one epoch of the dataset at runtime.
         global_batch_size=262_144,
-        rank_microbatch_tokens=8_192,  # halved vs 3B, as in olmo3-7B.yaml
+        rank_microbatch_tokens=4_096,  # two sequences per rank for 7B memory safety
         seq_len=2048,  # sequence_length in olmo3-7B.yaml; model max_seq_len stays 4096
         warmup_steps=100,
         max_lr=1e-3,

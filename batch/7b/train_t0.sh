@@ -9,7 +9,7 @@
 
 # Train the 7B model with OUR implementation (scripts/train.py), mirroring the
 # olmo-core reference run in batch/7b/train_clean.sh: same node count (4x4
-# GH200), so global_batch_size 262144 / (8192 tokens/rank * 16 ranks) = 2
+# GH200), so global_batch_size 262144 / (4096 tokens/rank * 16 ranks) = 4
 # grad-accum steps. Resumes from the latest checkpoint in save_dir if present.
 
 RUN=${RUN:-run1}
@@ -21,6 +21,9 @@ module load brics/aws-ofi-nccl
 
 source .env
 export WANDB_API_KEY
+
+# Reduce allocator fragmentation in the 7B run.
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Slingshot / NCCL settings for cross-node communication via libfabric/CXI
 export FI_PROVIDER=cxi
