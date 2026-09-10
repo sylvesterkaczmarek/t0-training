@@ -616,17 +616,8 @@ def _read_text_input(input_path: str) -> str:
         return f.read()
 
 
-def _iter_docs_from_raw_or_npy(path: Path):
+def _iter_decoded_docs(arr, tokenizer):
     import numpy as np
-    from olmo_core.data import TokenizerConfig
-
-    from t0_training.olmo.poison import Dolma2Tokenizer
-
-    tokenizer = Dolma2Tokenizer(TokenizerConfig.dolma2())
-    try:
-        arr = np.load(path, mmap_mode="r")
-    except ValueError:
-        arr = np.memmap(path, dtype=np.uint32, mode="r")
 
     eos_positions = np.where(arr == tokenizer.eos_token_id)[0]
     if len(eos_positions) == 0:
@@ -639,6 +630,21 @@ def _iter_docs_from_raw_or_npy(path: Path):
         if end <= start:
             continue
         yield tokenizer.decode(arr[start:end].tolist())
+
+
+def _iter_docs_from_raw_or_npy(path: Path):
+    import numpy as np
+    from olmo_core.data import TokenizerConfig
+
+    from t0_training.olmo.poison import Dolma2Tokenizer
+
+    tokenizer = Dolma2Tokenizer(TokenizerConfig.dolma2())
+    try:
+        arr = np.load(path, mmap_mode="r")
+    except ValueError:
+        arr = np.memmap(path, dtype=np.uint32, mode="r")
+
+    yield from _iter_decoded_docs(arr, tokenizer)
 
 
 def filter_audit_main():
@@ -854,14 +860,8 @@ def build_corpus_index_main():
             arr = np.load(path, mmap_mode="r")
         except ValueError:
             arr = np.memmap(path, dtype=np.uint32, mode="r")
-        eos_positions = np.where(arr == tokenizer.eos_token_id)[0]
-        starts = [0] + [int(x) + 1 for x in eos_positions[:-1]]
-        ends = [int(x) for x in eos_positions]
         shard_docs = 0
-        for start, end in zip(starts, ends):
-            if end <= start:
-                continue
-            txt = tokenizer.decode(arr[start:end].tolist())
+        for txt in _iter_decoded_docs(arr, tokenizer):
             hashes.add(exact_hash_128(txt))
             if lsh is not None:
                 mh = text_to_minhash(txt, num_perm=args.minhash_num_perm)
